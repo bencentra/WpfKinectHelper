@@ -3,6 +3,8 @@
 
 A helper class designed to make working with the Microsoft Kinect in C# WPF Applications a breeze.  
 
+(The Kinect SDK and a Microsoft Kinect are required)
+
 Made by Ben Centra (bencentra@csh.rit.edu)
 
 What does it do?
@@ -55,9 +57,10 @@ To view the output of the Kinect's data streams, set the Source property of the 
 
 You can use some additional KinectHelper methods to control the motor angle and toggle Seated mode in event handlers for the other controls created in MainWindow.xaml:
 
-	helper.AdjustElevationAngle((int)_tiltSlider.Value); // Adjust the motor angle using the value of a Slider control (value range -27 to +27)
-
-	helper.ToggleSeatedMode(true); // Toggle Skeleton Tracking mode (true = Seated, false = Default)
+	// Adjust the motor angle using the value of a Slider control (value range -27 to +27)
+	helper.AdjustElevationAngle((int)_tiltSlider.Value); 
+	// Toggle Skeleton Tracking mode (true = Seated, false = Default)
+	helper.ToggleSeatedMode(true); 
 
 To-Do's
 -------
