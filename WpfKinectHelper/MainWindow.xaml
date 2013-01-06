@@ -1,0 +1,20 @@
+﻿<Window x:Class="WpfKinectHelper.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="KinectHelper Demo" Height="612" Width="1024" Loaded="MainWindow_Loaded" Closing="MainWindow_Closing">
+    <Grid>
+        <Image Height="240" HorizontalAlignment="Left" Margin="12,25,0,0" Name="_colorImage" Stretch="Fill" VerticalAlignment="Top" Width="320" />
+        <Image Height="240" HorizontalAlignment="Left" Margin="12,264,0,0" Name="_depthImage" Stretch="Fill" VerticalAlignment="Top" Width="320" />
+        <Image Height="480" HorizontalAlignment="Left" Margin="350,25,0,0" Name="_skeletonImage" Stretch="Fill" VerticalAlignment="Top" Width="640" />
+        <Label Content="Color/Depth Streams:" Height="28" HorizontalAlignment="Left" Margin="12,0,0,0" Name="label1" VerticalAlignment="Top" />
+        <Label Content="Skeleton Stream:" Height="28" HorizontalAlignment="Left" Margin="350,0,0,0" Name="label2" VerticalAlignment="Top" />
+        <Label Content="Tilt Control:" Height="28" HorizontalAlignment="Left" Margin="12,510,0,0" Name="label3" VerticalAlignment="Top" />
+        <Label Content="Seated Mode:" Height="28" HorizontalAlignment="Left" Margin="884,0,0,0" Name="label4" VerticalAlignment="Top" />
+        <CheckBox Height="16" HorizontalAlignment="Left" Margin="972,8,0,0" Name="_modeCheckbox" VerticalAlignment="Top" Checked="modeCheckBox_Checked" Unchecked="modeCheckBox_Unchecked" />
+        <Slider Height="23" HorizontalAlignment="Left" Margin="31,536,0,0" Name="_tiltSlider" VerticalAlignment="Top" Width="200" Maximum="27" Minimum="-27" />
+        <Label Content="-27" Height="28" HorizontalAlignment="Left" Margin="12,533,0,0" Name="label5" VerticalAlignment="Top" FontSize="10" />
+        <Label Content="+27" FontSize="10" Height="28" HorizontalAlignment="Right" Margin="0,533,748,0" Name="label6" VerticalAlignment="Top" />
+        <Button Content="Update" Height="23" HorizontalAlignment="Left" Margin="264,535,0,0" Name="_tiltButton" VerticalAlignment="Top" Width="62" Click="tiltButton_Click" />
+        <Label Content="KinectHelper Demo" Height="38" HorizontalAlignment="Left" Margin="815,523,0,0" Name="label7" VerticalAlignment="Top" FontSize="18" FontWeight="Bold" />
+    </Grid>
+</Window>
