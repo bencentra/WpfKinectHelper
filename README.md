@@ -14,6 +14,7 @@ What does it do?
 *  Converts Color and Depth data for easy display  
 *  Draws Skeleton bones and joints in both Default and Seated modes  
 *  Access to Kinect motor for angle adjustment  
+*  Access to live stream data through custom events
 
 How do I use it?
 ----------------
@@ -61,11 +62,28 @@ You can use some additional KinectHelper methods to control the motor angle and 
 	helper.AdjustElevationAngle((int)_tiltSlider.Value); 
 	// Toggle Skeleton Tracking mode (true = Seated, false = Default)
 	helper.ToggleSeatedMode(true); 
+	
+You can also access stream data directly using custom events. For example, to listen for SkeletonDataChange events, first add the following to your Main Window Loaded event:
 
+	// Listen for data stream change events 
+    helper.SkeletonDataChanged += new KinectHelper.SkeletonDataChangedEvent(SkeletonDataChange);
+
+Then, add the event handler method ("SkeletonDataChange") to MainWindow.xaml.cs:
+
+	// Event Handler for changes in Skeleton data
+    // Allows for direct access to the Skeleton data
+    private void SkeletonDataChange(object sender, SkeletonDataChangeEventArgs e)
+    {
+        //Get the position of the first Skeleton
+        Skeleton skel = e.skeletons[0];
+        Point skelPoint = helper.SkeletonPointToScreen(skel.Position);
+        Console.WriteLine("Skeleton 1 at (" + skelPoint.X.ToString() + "," + skelPoint.Y.ToString() + ")!");
+    }
+	
 To-Do's
 -------
 
-* Allow direct access to Color, Depth, and Skeleton data streams  
+* Finish/Fix/Optimize data stream change events  
 * Expand beyond WPF Applications (test in different project types)
 * Add more features (Mic Array control, Face Tracking, etc)
 

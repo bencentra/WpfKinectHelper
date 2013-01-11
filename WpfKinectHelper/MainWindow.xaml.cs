@@ -11,6 +11,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using Microsoft.Kinect;
 
 namespace WpfKinectHelper
 {
@@ -46,6 +47,11 @@ namespace WpfKinectHelper
             _colorImage.Source = helper.colorBitmap;
             _depthImage.Source = helper.depthBitmap;
             _skeletonImage.Source = helper.skeletonBitmap;
+
+            // Listen for data stream change events 
+            helper.ColorDataChanged += new KinectHelper.ColorDataChangedEvent(ColorDataChange);
+            helper.DepthDataChanged += new KinectHelper.DepthDataChangedEvent(DepthDataChange);
+            helper.SkeletonDataChanged += new KinectHelper.SkeletonDataChangedEvent(SkeletonDataChange);
         }
 
         // Event Handler for the Window's Closing event
@@ -76,5 +82,28 @@ namespace WpfKinectHelper
             helper.ToggleSeatedMode(false);
         }
 
+        // Event Handler for changes in Color data
+        // Allows for direct access to the color data
+        private void ColorDataChange(object sender, ColorDataChangeEventArgs e)
+        {
+            Console.WriteLine("Here's the first color byte: " + e.colorData[0].ToString());
+        }
+
+        // Event Handler for changes in Depth data
+        // Allows for direct access to the depth (and converted RGB) data
+        private void DepthDataChange(object sender, DepthDataChangeEventArgs e)
+        {
+            // TO-DO: Is the rgbData returning anything useful?
+            Console.WriteLine("Here's the first depth (rgb) byte: " + e.rgbData[e.rgbData.Length/4].ToString());
+        }
+
+        // Event Handler for changes in Skeleton data
+        // Allows for direct access to the Skeleton data
+        private void SkeletonDataChange(object sender, SkeletonDataChangeEventArgs e)
+        {
+            Skeleton skel = e.skeletons[0];
+            Point skelPoint = helper.SkeletonPointToScreen(skel.Position);
+            Console.WriteLine("Skeleton 1 at (" + skelPoint.X.ToString() + "," + skelPoint.Y.ToString() + ")!");
+        }
     }
 }

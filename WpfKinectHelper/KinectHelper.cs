@@ -20,6 +20,9 @@ using Microsoft.Kinect;
 
 namespace WpfKinectHelper
 {
+    /*
+     *  KinectHelper - Contains helpful methods and events for working with the Kinect
+     */
     class KinectHelper
     {
         // The KincectSensor being used
@@ -58,6 +61,37 @@ namespace WpfKinectHelper
 
         // Other behavioral settings
         private const bool ResetAngleOnStartup = true;
+
+        // Event delegate definitions
+        public delegate void ColorDataChangedEvent(object sender, ColorDataChangeEventArgs e); // Color data change event
+        public delegate void DepthDataChangedEvent(object sender, DepthDataChangeEventArgs e); // Depth data change event
+        public delegate void SkeletonDataChangedEvent(object sender, SkeletonDataChangeEventArgs e); // Skeleton data change event
+
+        // Event delegate instances
+        public ColorDataChangedEvent ColorDataChanged; // Color data change
+        protected virtual void ColorDataChange(ColorDataChangeEventArgs e)
+        {
+            if (ColorDataChanged != null)
+            {
+                ColorDataChanged(this, e);
+            }
+        }
+        public DepthDataChangedEvent DepthDataChanged; // Depth data change
+        protected virtual void DepthDataChange(DepthDataChangeEventArgs e)
+        {
+            if (DepthDataChanged != null)
+            {
+                DepthDataChanged(this, e);
+            }
+        }
+        public SkeletonDataChangedEvent SkeletonDataChanged; // Skeleton data change
+        protected virtual void SkeletonDataChange(SkeletonDataChangeEventArgs e)
+        {
+            if (SkeletonDataChanged != null)
+            {
+                SkeletonDataChanged(this, e);
+            }
+        }
 
         // Default Constructor 
         // NOTE: Everything will have to be enabled manually
@@ -196,6 +230,9 @@ namespace WpfKinectHelper
                         colorFrame.CopyPixelDataTo(this.colorStreamData);
                         // Write the pixel data to the colorBitmap image
                         colorBitmap.WritePixels(new Int32Rect(0, 0, colorFrame.Width, colorFrame.Height), colorStreamData, colorFrame.Width * colorFrame.BytesPerPixel, 0);
+                        // Dispatch the ColorDataChange event
+                        ColorDataChangeEventArgs c = new ColorDataChangeEventArgs(colorStreamData);
+                        ColorDataChange(c);
                     }
                     catch (NullReferenceException ex)
                     {
@@ -233,6 +270,9 @@ namespace WpfKinectHelper
                         }
                         // Write the converted depth data to the depthBitmap image
                         depthBitmap.WritePixels(new Int32Rect(0, 0, depthBitmap.PixelWidth, depthBitmap.PixelHeight), depthRgbData, depthBitmap.PixelWidth * sizeof(int), 0);
+                        // Dispatch the DepthDataChange event
+                        DepthDataChangeEventArgs d = new DepthDataChangeEventArgs(depthStreamData, depthRgbData);
+                        DepthDataChange(d);
                     }
                     catch (NullReferenceException ex)
                     {
@@ -259,6 +299,9 @@ namespace WpfKinectHelper
                         // Get the Skeleton data from the SkeletonFrame
                         skeletonStreamData = new Skeleton[skeletonFrame.SkeletonArrayLength];
                         skeletonFrame.CopySkeletonDataTo(skeletonStreamData);
+                        // Dispatch the SkeletonDataChange event
+                        SkeletonDataChangeEventArgs s = new SkeletonDataChangeEventArgs(skeletonStreamData);
+                        SkeletonDataChange(s);
                     }
                     catch (NullReferenceException ex)
                     {
@@ -355,8 +398,9 @@ namespace WpfKinectHelper
         }
 
         // Map a SkeletonPoint to a Point that can be used for drawing
-        private Point SkeletonPointToScreen(SkeletonPoint point)
+        public Point SkeletonPointToScreen(SkeletonPoint point)
         {
+            // TO-DO: Handle NullReferenceException somehow
             DepthImagePoint depthPoint = Kinect.CoordinateMapper.MapSkeletonPointToDepthPoint(point, DepthImageFormat.Resolution640x480Fps30);
             return new Point(depthPoint.X, depthPoint.Y);
         }
@@ -401,4 +445,48 @@ namespace WpfKinectHelper
             }
         }
     }
+
+    // TO-DO: Move these into separate class files
+
+    /*
+     *  ColorDataChangeEventArgs - Information for custom event fired when ColorStream data changes
+     */
+    public class ColorDataChangeEventArgs
+    {
+        public readonly byte[] colorData;
+
+        public ColorDataChangeEventArgs(byte[] colorData)
+        {
+            this.colorData = colorData;
+        }
+    }
+
+    /*
+     *  DepthDataChangeEventArgs - Information for custom event fired when DepthStream data changes
+     */
+    public class DepthDataChangeEventArgs
+    {
+        public readonly DepthImagePixel[] depthData;
+        public readonly byte[] rgbData;
+
+        public DepthDataChangeEventArgs(DepthImagePixel[] depthData, byte[] rgbData)
+        {
+            this.depthData = depthData;
+            this.rgbData = rgbData;
+        }
+    }
+
+    /*
+     *  SkeletonDataChangeEventArgs - Information for custom event fired when SkeletonStream data changes
+     */ 
+    public class SkeletonDataChangeEventArgs
+    {
+        public readonly Skeleton[] skeletons;
+
+        public SkeletonDataChangeEventArgs(Skeleton[] skeletons)
+        {
+            this.skeletons = skeletons;
+        }
+    }
+ 
 }
