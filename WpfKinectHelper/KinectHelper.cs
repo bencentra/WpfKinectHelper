@@ -2,9 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.IO;
+using System.Threading;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using Microsoft.Kinect;
 
 /*
@@ -12,6 +15,10 @@ using Microsoft.Kinect;
  *  
  *  A helper class containing all the important operations for 
  *  interacting with the Microsoft Kinect in a C# WPF Application.
+ *  
+ *  Version 1.01
+ *  Changes:
+ *      - Can set the background of the skeletonBitmap using ChangeSkeletonBackgroundColor()
  *                       
  *  Written by Ben Centra, with inspiration from:
  *  - http://www.renauddumont.be/en/2012/kinect-sdk-1-0-1-introduction-a-lapi
@@ -32,6 +39,7 @@ namespace WpfKinectHelper
         public bool UseColorImageStream { get; set; } // ColorImageStream (RGB Video)
         public bool UseDepthImageStream { get; set; } // DepthImageStream (Depth Data)
         public bool UseSkeletonStream { get; set; } // SkeletonStream (Skeleton Tracking)
+        public bool UseAudioStream { get; set; } // AudioStream 
         
         // ColorImageStream variables
         private byte[] colorStreamData; // Byte array of image data from a ColorImageFrame
@@ -42,7 +50,7 @@ namespace WpfKinectHelper
         private byte[] depthRgbData; // Byte array to store depth data converted to RGB
         public WriteableBitmap depthBitmap { get; set; } // WriteableBitmap to display the converted depth data
 
-        //SkeletonStream variables
+        // SkeletonStream variables
         private Skeleton[] skeletonStreamData; // Skeleton array of Skeletons received in each SkeletonFrame
         private DrawingGroup drawingGroup; // DrawingGroup for rendering the Skeletons
         public DrawingImage skeletonBitmap { get; set; } // Image to render the Skeletons to
@@ -53,6 +61,7 @@ namespace WpfKinectHelper
         private const double JointThickness = 3;
         private const double BodyCenterThickness = 10;
         private const double ClipBoundsThickness = 10;
+        private Brush backgroundBrush = Brushes.White;
         private readonly Brush centerPointBrush = Brushes.Blue;
         private readonly Brush trackedJointBrush = Brushes.LightBlue;
         private readonly Brush inferredJointBrush = Brushes.Yellow;
@@ -92,7 +101,7 @@ namespace WpfKinectHelper
                 SkeletonDataChanged(this, e);
             }
         }
-
+        
         // Default Constructor 
         // NOTE: Everything will have to be enabled manually
         public KinectHelper()
@@ -145,7 +154,7 @@ namespace WpfKinectHelper
             {
                 SetNewKinect(firstKinect);
             }
-            // Add a custom StatusCHanged event handler to all KinectSensors
+            // Add a custom StatusChanged event handler to all KinectSensors
             KinectSensor.KinectSensors.StatusChanged += KinectStatusChanged;
         }
 
@@ -314,7 +323,7 @@ namespace WpfKinectHelper
             using (DrawingContext dc = this.drawingGroup.Open())
             {
                 // Draw a black background the size of our render
-                dc.DrawRectangle(Brushes.Black, null, new Rect(0, 0, RenderWidth, RenderHeight));
+                dc.DrawRectangle(backgroundBrush, null, new Rect(0, 0, RenderWidth, RenderHeight));
                 
                 //Draw each Skeleton
                 if (skeletonStreamData.Length != 0)
@@ -444,9 +453,15 @@ namespace WpfKinectHelper
                 }
             }
         }
+
+        // Change the background colors of the skeletonBitmap
+        public void ChangeSkeletonBackgroundColor(Brush brush)
+        {
+            backgroundBrush = brush;
+        }
     }
 
-    // TO-DO: Move these into separate class files
+    // TO-DO: Move these into separate class files?
 
     /*
      *  ColorDataChangeEventArgs - Information for custom event fired when ColorStream data changes
@@ -488,5 +503,20 @@ namespace WpfKinectHelper
             this.skeletons = skeletons;
         }
     }
+
+    /*
+     * AudioDataChangeEventArgs - Information for custom event fired when a new section of the audio buffer is ready
+     */
+    /*
+    public class AudioDataChangeEventArgs
+    {
+        public readonly byte[] audioBuffer;
+
+        public AudioDataChangeEventArgs(byte[] audioBuffer)
+        {
+            this.audioBuffer = audioBuffer;
+        }
+    }
+    */
  
 }

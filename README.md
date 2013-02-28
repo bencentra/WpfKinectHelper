@@ -7,6 +7,12 @@ A helper class designed to make working with the Microsoft Kinect in C# WPF Appl
 
 Made by Ben Centra (bencentra@csh.rit.edu)
 
+Changes
+-------
+
+Version 1.01 - 2/28/13     
+*  Can set the background of the skeletonBitmap using ChangeSkeletonBackgroundColor()    
+
 What does it do?
 ----------------
 
@@ -84,8 +90,7 @@ To-Do's
 -------
 
 * Finish/Fix/Optimize data stream change events  
-* Expand beyond WPF Applications (test in different project types)
-* Add more features (Mic Array control, Face Tracking, etc)
+* Add more features (Mic Array control, Face Tracking, Gestures, etc)
 
 Sources
 -------

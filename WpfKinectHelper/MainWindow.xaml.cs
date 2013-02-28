@@ -34,14 +34,14 @@ namespace WpfKinectHelper
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             // Enable the Kinect and data streams manually with default constructor
-            helper = new KinectHelper();
-            helper.UseColorImageStream = true;
-            helper.UseDepthImageStream = true;
-            helper.UseSkeletonStream = true;
-            helper.InitializeKinectSensor();
+            //helper = new KinectHelper();
+            //helper.UseColorImageStream = true;
+            //helper.UseDepthImageStream = true;
+            //helper.UseSkeletonStream = true;
+            //helper.InitializeKinectSensor();
             
             // Enable the Kinect and all data streams with shorthand constructor
-            //helper = new KinectHelper(true, true, true);
+            helper = new KinectHelper(true, true, true);
 
             // Link the UI Images with the images produced by the Kinect
             _colorImage.Source = helper.colorBitmap;
@@ -52,6 +52,9 @@ namespace WpfKinectHelper
             helper.ColorDataChanged += new KinectHelper.ColorDataChangedEvent(ColorDataChange);
             helper.DepthDataChanged += new KinectHelper.DepthDataChangedEvent(DepthDataChange);
             helper.SkeletonDataChanged += new KinectHelper.SkeletonDataChangedEvent(SkeletonDataChange);
+
+            // Change the background color of the skeleton image
+            helper.ChangeSkeletonBackgroundColor(Brushes.Black);
         }
 
         // Event Handler for the Window's Closing event
@@ -101,9 +104,19 @@ namespace WpfKinectHelper
         // Allows for direct access to the Skeleton data
         private void SkeletonDataChange(object sender, SkeletonDataChangeEventArgs e)
         {
+            //Get the position of the first Skeleton
             Skeleton skel = e.skeletons[0];
             Point skelPoint = helper.SkeletonPointToScreen(skel.Position);
             Console.WriteLine("Skeleton 1 at (" + skelPoint.X.ToString() + "," + skelPoint.Y.ToString() + ")!");
         }
+
+        // Event Handler for changes in Audio data
+        // Allows for direct access to the audio stream buffer
+        /*
+        private void AudioDataChange(object sender, AudioDataChangeEventArgs e)
+        {
+            Console.WriteLine("Audio buffer length: " + e.audioBuffer.Length);
+        }
+        */
     }
 }
