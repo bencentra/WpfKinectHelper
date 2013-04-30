@@ -35,6 +35,15 @@ namespace WpfKinectHelper
         // The KincectSensor being used
         private KinectSensor Kinect { get; set; }
 
+        // Coordinate Mapper (for custom conversions beyond the Skeleton)
+        public CoordinateMapper PointMapper
+        {
+            get
+            {
+                return Kinect.CoordinateMapper;
+            }
+        }
+
         // Booleans to track which streams should be enabled
         public bool UseColorImageStream { get; set; } // ColorImageStream (RGB Video)
         public bool UseDepthImageStream { get; set; } // DepthImageStream (Depth Data)
