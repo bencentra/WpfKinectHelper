@@ -15,11 +15,17 @@ using Microsoft.Kinect;
  *  
  *  A helper class containing all the important operations for 
  *  interacting with the Microsoft Kinect in a C# WPF Application.
- *  
- *  Version 1.01
+ *  =====
  *  Changes:
- *      - Can set the background of the skeletonBitmap using ChangeSkeletonBackgroundColor()
- *                       
+ * 
+ *  Version 1.02 - 06/03/13
+ *  - Added InfraredStream option, overrides output of ColorImageStream (Kinect can only do one or the other)
+ *  - Added AudioStream, can get audio buffer, beam angle, and source angle.
+ *
+ *  Version 1.01 - 2/28/13     
+ *  - Can set the background of the skeletonBitmap using ChangeSkeletonBackgroundColor()   
+ *  - Added PointMapper to allow for point-to-screen conversion outside of drawing the skeleton
+ *  =====                     
  *  Written by Ben Centra, with inspiration from:
  *  - http://www.renauddumont.be/en/2012/kinect-sdk-1-0-1-introduction-a-lapi
  *  - http://msdn.microsoft.com/en-us/library/hh855347.aspx
@@ -49,7 +55,8 @@ namespace WpfKinectHelper
         public bool UseDepthImageStream { get; set; } // DepthImageStream (Depth Data)
         public bool UseSkeletonStream { get; set; } // SkeletonStream (Skeleton Tracking)
         public bool UseAudioStream { get; set; } // AudioStream 
-        
+        public bool UseInfraredStream { get; set; } // InfraredStream (NOTE: Overrides ColorImageStream!)
+
         // ColorImageStream variables
         private byte[] colorStreamData; // Byte array of image data from a ColorImageFrame
         public WriteableBitmap colorBitmap { get; set; } // WriteableBitmap to display the image data
@@ -77,6 +84,19 @@ namespace WpfKinectHelper
         private readonly Pen trackedBonePen = new Pen(Brushes.Green, 6);
         private readonly Pen inferredBonePen = new Pen(Brushes.Gray, 1);
 
+        // AudioStream variables
+        private const int AudioPollingInterval = 50; // Number of milliseconds between each audio stream read
+        private const int SamplesPerMillisecond = 16; // Number of samples captured each millisecond
+        private const int BytesPerSample = 2; // Number of bytes per sample (bit depth, 2 * 8 = 16 bit audio)
+        private Stream audioStream; // Stream of audio being captured
+        public double beamRotation { get; set; } // Beam Angle
+        public double sourceRotation { get; set; } // Source Angle
+        private bool reading; // Track if we are currently reading audio
+        private Thread audioThread; // Separate thread for capturing audio (prevent UI from hanging)
+        private byte[] audioBuffer; // Buffer to store the audio stream data
+        public bool isReading { get { return this.reading; } }
+
+
         // Other behavioral settings
         private const bool ResetAngleOnStartup = true;
 
@@ -84,6 +104,7 @@ namespace WpfKinectHelper
         public delegate void ColorDataChangedEvent(object sender, ColorDataChangeEventArgs e); // Color data change event
         public delegate void DepthDataChangedEvent(object sender, DepthDataChangeEventArgs e); // Depth data change event
         public delegate void SkeletonDataChangedEvent(object sender, SkeletonDataChangeEventArgs e); // Skeleton data change event
+        public delegate void AudioDataChangedEvent(object sender, AudioDataChangeEventArgs e); // Audio data change event
 
         // Event delegate instances
         public ColorDataChangedEvent ColorDataChanged; // Color data change
@@ -110,7 +131,15 @@ namespace WpfKinectHelper
                 SkeletonDataChanged(this, e);
             }
         }
-        
+        public AudioDataChangedEvent AudioDataChanged; // Audio data change
+        protected virtual void AudioDataChange(AudioDataChangeEventArgs e)
+        {
+            if (AudioDataChanged != null)
+            {
+                AudioDataChanged(this, e);
+            }
+        }
+
         // Default Constructor 
         // NOTE: Everything will have to be enabled manually
         public KinectHelper()
@@ -119,16 +148,20 @@ namespace WpfKinectHelper
             this.UseColorImageStream = false;
             this.UseDepthImageStream = false;
             this.UseSkeletonStream = false;
+            this.UseAudioStream = false;
+            this.UseInfraredStream = false;
         }
 
         // Constructor with boolean triggers
         // Streams are enabled if corresponding parameter is set to "true"
-        public KinectHelper(bool useColor, bool useDepth, bool useSkeleton)
+        public KinectHelper(bool useColor, bool useDepth, bool useSkeleton, bool useAudio, bool useInfrared)
         {
             // Start with all streams disabled
             this.UseColorImageStream = false;
             this.UseDepthImageStream = false;
             this.UseSkeletonStream = false;
+            this.UseAudioStream = false;
+            this.UseInfraredStream = false;
 
             // Enable the various streams if corresponding output Images were provided
             if (useColor)
@@ -137,6 +170,13 @@ namespace WpfKinectHelper
                 this.UseDepthImageStream = true;
             if (useSkeleton)
                 this.UseSkeletonStream = true;
+            if (useAudio)
+                this.UseAudioStream = true;
+            if (useInfrared)
+            {
+                this.UseColorImageStream = false;
+                this.UseInfraredStream = true;
+            }
 
             // Initialize the Kinect
             InitializeKinectSensor();
@@ -186,40 +226,44 @@ namespace WpfKinectHelper
         // Shut down an old KinectSensor
         private void StopKinect(KinectSensor oldKinect)
         {
+            // Stop any enabled data streams
+            if (this.UseColorImageStream || this.UseInfraredStream)
+                StopColorStream(oldKinect);
+            if (this.UseDepthImageStream)
+                StopDepthStream(oldKinect);
+            if (this.UseSkeletonStream)
+                StopSkeletonStream(oldKinect);
+            if (this.UseAudioStream)
+                StopAudioStream(oldKinect);
+            // Stop the Kinect
             oldKinect.Stop();
         }
 
         // Start up a new KinectSensor
         private void StartKinect(KinectSensor newKinect)
         {
-            // Enable the ColorStream and listen for ColorFrameReady events
-            if (this.UseColorImageStream)
+            // Enable the ColorImageStream or InfraredStream and listen for ColorFrameReady events
+            if (this.UseColorImageStream || this.UseInfraredStream)
             {
-                newKinect.ColorStream.Enable(ColorImageFormat.RgbResolution640x480Fps30);
-                this.colorStreamData = new byte[newKinect.ColorStream.FramePixelDataLength];
-                this.colorBitmap = new WriteableBitmap(newKinect.ColorStream.FrameWidth, newKinect.ColorStream.FrameHeight, 96, 96, PixelFormats.Bgr32, null);
-                newKinect.ColorFrameReady += KinectColorFrameReady;
+                StartColorStream(newKinect);
             }
             // Enable the DepthStream and listen for DepthFrameReady events
             if (this.UseDepthImageStream)
             {
-                newKinect.DepthStream.Enable(DepthImageFormat.Resolution640x480Fps30);
-                this.depthStreamData = new DepthImagePixel[newKinect.DepthStream.FramePixelDataLength];
-                this.depthRgbData = new byte[newKinect.DepthStream.FramePixelDataLength * sizeof(int)];
-                this.depthBitmap = new WriteableBitmap(newKinect.DepthStream.FrameWidth, newKinect.DepthStream.FrameHeight, 96, 96, PixelFormats.Bgr32, null);
-                newKinect.DepthFrameReady += KinectDepthFrameReady;
+                StartDepthStream(newKinect);
             }
             // Enable the SkeletonStream and listen for SkeletonFrameReady event
             if (this.UseSkeletonStream)
             {
-                newKinect.SkeletonStream.Enable();
-                this.skeletonStreamData = new Skeleton[newKinect.SkeletonStream.FrameSkeletonArrayLength];
-                this.drawingGroup = new DrawingGroup();
-                this.skeletonBitmap = new DrawingImage(this.drawingGroup);
-                newKinect.SkeletonFrameReady += KinectSkeletonFrameReady;
+                StartSkeletonStream(newKinect);
             }
             // Start the Kinect
             newKinect.Start();
+            // Enable the AudioStream (Kinect must be started FIRST so we have access to the audio source)
+            if (this.UseAudioStream)
+            {
+                StartAudioStream(newKinect);
+            }
         }
 
         // Custom Event Handler for a change in KinectSensor status
@@ -231,6 +275,34 @@ namespace WpfKinectHelper
             // If the current Kinect changes it's status, disconnect the current Kinect
             if (e.Sensor == this.Kinect)
                 SetNewKinect(null);
+        }
+
+        // Start the ColorImageStream
+        private void StartColorStream(KinectSensor sensor)
+        {
+            // Default to the settings for the ColorImageStream
+            ColorImageFormat cif = ColorImageFormat.RgbResolution640x480Fps30;
+            PixelFormat pf = PixelFormats.Bgr32;
+            // If enabled, change the settings for the InfraredStream
+            if (this.UseInfraredStream)
+            {
+                cif = ColorImageFormat.InfraredResolution640x480Fps30;
+                pf = PixelFormats.Gray16;
+            }
+            // Enable the stream
+            sensor.ColorStream.Enable(cif);
+            this.colorStreamData = new byte[sensor.ColorStream.FramePixelDataLength];
+            this.colorBitmap = new WriteableBitmap(sensor.ColorStream.FrameWidth, sensor.ColorStream.FrameHeight, 96, 96, pf, null);
+            sensor.ColorFrameReady += KinectColorFrameReady;
+        }
+
+        // Stop the ColorImageStream
+        private void StopColorStream(KinectSensor sensor)
+        {
+            sensor.ColorFrameReady -= KinectColorFrameReady;
+            //this.colorBitmap = null;
+            //this.colorStreamData = null;
+            sensor.ColorStream.Disable();
         }
 
         // Event Handler for ColorFrameReady events
@@ -254,10 +326,30 @@ namespace WpfKinectHelper
                     }
                     catch (NullReferenceException ex)
                     {
-                        Console.WriteLine(ex.TargetSite +" - " + ex.Message);
+                        Console.WriteLine(ex.TargetSite + " - " + ex.Message);
                     }
                 }
             }
+        }
+
+        // Start the DepthStream
+        private void StartDepthStream(KinectSensor sensor)
+        {
+            sensor.DepthStream.Enable(DepthImageFormat.Resolution640x480Fps30);
+            this.depthStreamData = new DepthImagePixel[sensor.DepthStream.FramePixelDataLength];
+            this.depthRgbData = new byte[sensor.DepthStream.FramePixelDataLength * sizeof(int)];
+            this.depthBitmap = new WriteableBitmap(sensor.DepthStream.FrameWidth, sensor.DepthStream.FrameHeight, 96, 96, PixelFormats.Bgr32, null);
+            sensor.DepthFrameReady += KinectDepthFrameReady;
+        }
+
+        // Stop the DepthStream
+        private void StopDepthStream(KinectSensor sensor)
+        {
+            sensor.DepthFrameReady -= KinectDepthFrameReady;
+            //this.depthBitmap = null;
+            //this.depthRgbData = null;
+            //this.depthStreamData = null;
+            sensor.DepthStream.Disable();
         }
 
         // Event Handler for DepthFrameReady events
@@ -300,6 +392,26 @@ namespace WpfKinectHelper
             }
         }
 
+        // Start the SkeletonStream
+        private void StartSkeletonStream(KinectSensor sensor)
+        {
+            sensor.SkeletonStream.Enable();
+            this.skeletonStreamData = new Skeleton[sensor.SkeletonStream.FrameSkeletonArrayLength];
+            this.drawingGroup = new DrawingGroup();
+            this.skeletonBitmap = new DrawingImage(this.drawingGroup);
+            sensor.SkeletonFrameReady += KinectSkeletonFrameReady;
+        }
+
+        // Stop the SkeletonStream
+        private void StopSkeletonStream(KinectSensor sensor)
+        {
+            sensor.SkeletonFrameReady -= KinectSkeletonFrameReady;
+            //this.skeletonBitmap = null;
+            //this.drawingGroup = null;
+            //this.skeletonStreamData = null;
+            sensor.SkeletonStream.Disable();
+        }
+
         // Event Handler for SkeletonFrameReady events
         // (A new frame of SkeletonStream data is available)
         private void KinectSkeletonFrameReady(object sender, SkeletonFrameReadyEventArgs e)
@@ -333,7 +445,7 @@ namespace WpfKinectHelper
             {
                 // Draw a black background the size of our render
                 dc.DrawRectangle(backgroundBrush, null, new Rect(0, 0, RenderWidth, RenderHeight));
-                
+
                 //Draw each Skeleton
                 if (skeletonStreamData.Length != 0)
                 {
@@ -418,9 +530,77 @@ namespace WpfKinectHelper
         // Map a SkeletonPoint to a Point that can be used for drawing
         public Point SkeletonPointToScreen(SkeletonPoint point)
         {
-            // TO-DO: Handle NullReferenceException somehow
-            DepthImagePoint depthPoint = Kinect.CoordinateMapper.MapSkeletonPointToDepthPoint(point, DepthImageFormat.Resolution640x480Fps30);
-            return new Point(depthPoint.X, depthPoint.Y);
+            try
+            {
+                DepthImagePoint depthPoint = Kinect.CoordinateMapper.MapSkeletonPointToDepthPoint(point, DepthImageFormat.Resolution640x480Fps30);
+                return new Point(depthPoint.X, depthPoint.Y);
+            }
+            catch
+            {
+                return new Point(0, 0);
+            }
+        }
+
+        // Method to start the audioStream and audioThread
+        private void StartAudioStream(KinectSensor sensor)
+        {
+            if (sensor != null)
+            {
+                // Enable the audio stream
+                if (this.audioStream == null)
+                    this.audioStream = sensor.AudioSource.Start();
+                // Prepare the audio buffer
+                this.audioBuffer = new byte[AudioPollingInterval * SamplesPerMillisecond * BytesPerSample];
+                // Start the separate audio thread
+                this.reading = true;
+                this.audioThread = new Thread(AudioReadingThread);
+                this.audioThread.Start();
+                // Set some additional audio events for beam and source angle changes
+                sensor.AudioSource.BeamAngleChanged += AudioSourceBeamChanged;
+                sensor.AudioSource.SoundSourceAngleChanged += SoundSourceAngleChanged;
+            }
+        }
+
+        // Method to stop the audioStream and audioThread
+        private void StopAudioStream(KinectSensor sensor)
+        {
+            this.reading = false;
+            // Stop the thread
+            if (this.audioThread != null)
+                audioThread.Join();
+            // Remove event listeners and stop the audio stream
+            if (sensor != null)
+            {
+                sensor.AudioSource.BeamAngleChanged -= AudioSourceBeamChanged;
+                sensor.AudioSource.SoundSourceAngleChanged -= SoundSourceAngleChanged;
+                sensor.AudioSource.Stop();
+                //this.audioBuffer = null;
+                //this.audioStream = null;
+            }
+        }
+
+        // Method to call when the audioThread starts executing
+        private void AudioReadingThread()
+        {
+            while (this.reading)
+            {
+                int readCount = this.audioStream.Read(audioBuffer, 0, audioBuffer.Length);
+                // Dispatch the AudioDataChange event
+                AudioDataChangeEventArgs a = new AudioDataChangeEventArgs(this.audioBuffer, readCount, this.beamRotation, this.sourceRotation);
+                AudioDataChange(a);
+            }
+        }
+
+        // Event Handler for AudioSourceBeamChanged events
+        private void AudioSourceBeamChanged(object sender, BeamAngleChangedEventArgs e)
+        {
+            beamRotation = -e.Angle;
+        }
+
+        // Event Handler for AudioSourceSoundSourceAngleChanged events
+        private void SoundSourceAngleChanged(object sender, SoundSourceAngleChangedEventArgs e)
+        {
+            sourceRotation = -e.Angle;
         }
 
         // Call this to Stop the current Kinect before closing the program
@@ -470,8 +650,6 @@ namespace WpfKinectHelper
         }
     }
 
-    // TO-DO: Move these into separate class files?
-
     /*
      *  ColorDataChangeEventArgs - Information for custom event fired when ColorStream data changes
      */
@@ -502,7 +680,7 @@ namespace WpfKinectHelper
 
     /*
      *  SkeletonDataChangeEventArgs - Information for custom event fired when SkeletonStream data changes
-     */ 
+     */
     public class SkeletonDataChangeEventArgs
     {
         public readonly Skeleton[] skeletons;
@@ -515,17 +693,21 @@ namespace WpfKinectHelper
 
     /*
      * AudioDataChangeEventArgs - Information for custom event fired when a new section of the audio buffer is ready
+     *
      */
-    /*
     public class AudioDataChangeEventArgs
     {
-        public readonly byte[] audioBuffer;
+        public readonly byte[] buffer;
+        public readonly int readCount;
+        public readonly double beamAngle;
+        public readonly double sourceAngle;
 
-        public AudioDataChangeEventArgs(byte[] audioBuffer)
+        public AudioDataChangeEventArgs(byte[] buffer, int readCount, double beamAngle, double sourceAngle)
         {
-            this.audioBuffer = audioBuffer;
+            this.buffer = buffer;
+            this.readCount = readCount;
+            this.beamAngle = beamAngle;
+            this.sourceAngle = sourceAngle;
         }
     }
-    */
- 
 }
