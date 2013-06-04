@@ -1,6 +1,5 @@
 ﻿WpfKinectHelper
 ===============
-
 A helper class designed to make working with the Microsoft Kinect in C# WPF Applications a breeze.  
 
 (The Kinect SDK and a Microsoft Kinect are required)
@@ -9,14 +8,17 @@ Made by Ben Centra (bencentra@csh.rit.edu)
 
 Changes
 -------
+Version 1.02 - 06/03/13
+* Added InfraredStream option, overrides output of ColorImageStream (Kinect can only do one or the other)
+* Added AudioStream, can get audio buffer, beam angle, and source angle
 
 Version 1.01 - 2/28/13     
-*  Can set the background of the skeletonBitmap using ChangeSkeletonBackgroundColor()    
+* Can set the background of the skeletonBitmap using ChangeSkeletonBackgroundColor()    
+* Added PointMapper to allow for point-to-screen conversion outside of drawing the skeleton
 
 What does it do?
 ----------------
-
-*  Instantly sets up Color, Depth, and Skeleton data streams  
+*  Instantly sets up Color, Depth, Skeleton, and Audio data streams  
 *  Converts Color and Depth data for easy display  
 *  Draws Skeleton bones and joints in both Default and Seated modes  
 *  Access to Kinect motor for angle adjustment  
@@ -24,7 +26,6 @@ What does it do?
 
 How do I use it?
 ----------------
-
 Start by creating a new C# WPF Application in Visual Studio and adding 'KinectHelper.cs' to the project.
 
 Next, add the appropriate Controls to MainWindow.xaml, such as:
@@ -53,7 +54,8 @@ Instantiate the KinectHelper inside of a "Loaded" event handler for the Main Win
 You can also use the shorthand constructor for the KinectHelper to do all the above in one line:
 
 	// Enable the Kinect and all data streams with the shorthand constructor
-	helper = new KinectHelper(true, true, true); // KinectHelper(bool useColor, bool useDepth, bool useSkeleton)
+	// KinectHelper(bool useColor, bool useDepth, bool useSkeleton, bool useAudio, bool useInfrared)
+	helper = new KinectHelper(true, true, true, false, false); 
 
 To view the output of the Kinect's data streams, set the Source property of the Image controls created in MainWindow.xaml:
 
@@ -88,12 +90,10 @@ Then, add the event handler method ("SkeletonDataChange") to MainWindow.xaml.cs:
 	
 To-Do's
 -------
-
-* Finish/Fix/Optimize data stream change events  
-* Add more features (Mic Array control, Face Tracking, Gestures, etc)
+* Add more features (Face Tracking, Gestures, other SDK 1.7 stuff, etc)
+* Allow user to set Audio Stream options before initializing
 
 Sources
 -------
-
 * Kinect for Windows SDK Documentation: http://msdn.microsoft.com/en-us/library/hh855347.aspx
 * Kinect SDK Tutorials by Renaud Dumont: http://www.renauddumont.be/en/2012/kinect-sdk-1-0-1-introduction-a-lapi
